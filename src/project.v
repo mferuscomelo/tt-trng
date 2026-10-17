@@ -82,6 +82,18 @@ module tt_um_mferuscomelo_trng (
       .out_valid(vn_valid)
   );
 
+  wire health_fail;
+
+  health u_health (
+      .clk     (clk),
+      .rst_n   (rst_n),
+      .flush   (flush),
+      .enable  (ro_en && !test_mode),
+      .in_bit  (raw_bit),
+      .in_valid(raw_valid),
+      .fail    (health_fail)
+  );
+
   wire lfsr_bit;
   wire pk_ready;
 
@@ -154,7 +166,6 @@ module tt_um_mferuscomelo_trng (
   );
 
   // ---------------------------------------------------------------- outputs
-  wire health_fail = 1'b0;  // phase 4
   wire ro_div = 1'b0;  // phase 5
 
   assign uo_out = {1'b0, overflow, ro_div, raw_valid, raw_bit, underrun, health_fail, !fifo_empty};

@@ -325,6 +325,68 @@ async def test_overflow(dut):
     await ClockCycles(dut.clk, 5)
 
 
+async def feed_pattern(tb, pattern, nsamples):
+    """Drive the sampler's SIM-only hook with a repeating bit pattern, one bit
+    per sample (changed right after each strobe, well before the next)."""
+    hook = tb.dut.user_project.u_sampler
+    hook.sim_override.value = 1
+    fail_at = None
+    for n in range(nsamples):
+        hook.sim_bit.value = pattern[n % len(pattern)]
+        await RisingEdge(tb.dut.clk)
+        while not tb.uo(RAW_STROBE):
+            await RisingEdge(tb.dut.clk)
+        if fail_at is None and tb.uo(HEALTH_FAIL):
+            fail_at = n
+    hook.sim_override.value = 0
+    return fail_at
+
+
+@cocotb.test(skip=GATES)
+async def test_health_normal(dut):
+    """A good stream (stand-in rings) runs > 2 APT windows without FAIL."""
+    tb = Tb(dut)
+    await tb.start(ro_en=1)
+    await ClockCycles(dut.clk, 16 * 2600)
+    assert tb.uo(HEALTH_FAIL) == 0
+
+
+@cocotb.test(skip=GATES)
+async def test_health_rct(dut):
+    """Stuck source: the repetition count test fires at the 41st equal sample."""
+    tb = Tb(dut)
+    await tb.start(ro_en=1)
+    fail_at = await feed_pattern(tb, [1], 100)
+    assert fail_at is not None, "HEALTH_FAIL not set on a stuck stream"
+    dut._log.info(f"RCT fired after {fail_at + 1} samples")
+    assert fail_at + 1 <= 41 + 3, "RCT fired too late"
+    await tb.configure(ro_en=1, whiten=1)  # config change must not clear FAIL
+    assert tb.uo(HEALTH_FAIL) == 1, "HEALTH_FAIL must be sticky"
+
+
+@cocotb.test(skip=GATES)
+async def test_health_apt(dut):
+    """Runs of at most 4 (no RCT), but 80 % ones: the adaptive proportion
+    test fires (cutoff 793 of 1024). 75 % ones must pass."""
+    tb = Tb(dut)
+    await tb.start(ro_en=1)
+    assert await feed_pattern(tb, [1, 1, 1, 0], 3 * 1024) is None, "75 % ones must pass"
+    fail_at = await feed_pattern(tb, [1, 1, 1, 1, 0], 2 * 1024 + 8)
+    assert fail_at is not None, "APT did not fire on 80 % ones"
+    dut._log.info(f"APT fired after {fail_at + 1} samples")
+
+
+@cocotb.test(skip=GATES)
+async def test_health_gated(dut):
+    """Health tests are off while rings are stopped or in TEST mode."""
+    tb = Tb(dut)
+    await tb.start(ro_en=0, whiten=0)
+    await ClockCycles(dut.clk, 16 * 200)
+    assert tb.uo(HEALTH_FAIL) == 0
+    await tb.configure(ro_en=1, test=1)
+    assert await feed_pattern(tb, [1], 100) is None, "health must be off in TEST mode"
+
+
 @cocotb.test()
 async def test_sample_interval(dut):
     tb = Tb(dut)

@@ -23,13 +23,23 @@ module entropy_sampler #(
 
   wire ro_mix = single_ro ? ro_out[ro_sel] : ^ro_out;
 
+`ifdef SIM
+  // Test hook (RTL simulation only): the testbench can replace the ring
+  // signal with a bit pattern of its choice to exercise the health tests.
+  reg  sim_override = 1'b0;
+  reg  sim_bit = 1'b0;
+  wire ro_src = sim_override ? sim_bit : ro_mix;
+`else
+  wire ro_src = ro_mix;
+`endif
+
   reg sync0, sync1;
   always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       sync0 <= 1'b0;
       sync1 <= 1'b0;
     end else begin
-      sync0 <= ro_mix;
+      sync0 <= ro_src;
       sync1 <= sync0;
     end
   end
