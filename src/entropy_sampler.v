@@ -5,21 +5,23 @@
 
 `default_nettype none
 
-// XORs the ring outputs, synchronizes the result into `clk` and keeps one
-// sample every 16 / 64 / 256 / 1024 clocks.
+// XORs the ring outputs (or picks one of them), synchronizes the result into
+// `clk` and keeps one sample every 16 / 64 / 256 / 1024 clocks.
 module entropy_sampler #(
-    parameter N_RO = 4
+    parameter N_RO = 8
 ) (
     input  wire            clk,
     input  wire            rst_n,
     input  wire            flush,
     input  wire [N_RO-1:0] ro_out,      // asynchronous
+    input  wire            single_ro,   // 1 = use only ro_out[ro_sel]
+    input  wire [     2:0] ro_sel,
     input  wire [     1:0] sample_div,
     output reg             raw_bit,
     output reg             raw_valid
 );
 
-  wire ro_xor = ^ro_out;
+  wire ro_mix = single_ro ? ro_out[ro_sel] : ^ro_out;
 
   reg sync0, sync1;
   always @(posedge clk or negedge rst_n) begin
@@ -27,7 +29,7 @@ module entropy_sampler #(
       sync0 <= 1'b0;
       sync1 <= 1'b0;
     end else begin
-      sync0 <= ro_xor;
+      sync0 <= ro_mix;
       sync1 <= sync0;
     end
   end

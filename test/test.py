@@ -4,6 +4,7 @@
 import os
 
 import cocotb
+import cocotb.utils
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, RisingEdge, Timer
 
@@ -82,7 +83,9 @@ class Tb:
         await ClockCycles(dut.clk, 5)
         await self.configure(**cfg)
 
-    async def configure(self, **cfg):
+    async def configure(self, ro_sel=0, **cfg):
+        self.ro_sel = ro_sel
+        self._drive_uio()
         self.dut.ui_in.value = cfg_ui(**cfg)
         await ClockCycles(self.dut.clk, 5)  # sync + flush
 
@@ -194,12 +197,44 @@ async def test_raw(dut):
 @cocotb.test(skip=GATES)
 async def test_whitened(dut):
     tb = Tb(dut)
-    await tb.start(ro_en=1, whiten=1)
-    data = await tb.read_bytes(32)
-    r = ones_ratio(data)
-    dut._log.info(f"whitened ones ratio {r:.3f}")
-    assert 0.35 < r < 0.65
-    assert len(set(data)) > 1
+    await tb.start()
+    cycles = []
+    for decim in range(4):
+        await tb.configure(ro_en=1, whiten=1, decim=decim)
+        t0 = cocotb.utils.get_sim_time("ns")
+        data = await tb.read_bytes(8 if decim < 3 else 4)
+        cycles.append((cocotb.utils.get_sim_time("ns") - t0) / len(data))
+        r = ones_ratio(data)
+        dut._log.info(f"DECIM={decim}: ones ratio {r:.3f}, {cycles[-1]:.0f} ns/byte")
+        assert 0.25 < r < 0.75
+        assert len(set(data)) > 1
+    # each DECIM step halves the rate; allow generous slack for randomness
+    assert cycles[1] > 1.3 * cycles[0]
+    assert cycles[3] > 3 * cycles[1]
+
+
+@cocotb.test()
+async def test_single_ro_mux(dut):
+    tb = Tb(dut)
+    await tb.start()
+    # Stopped rings all output 1: one ring reads 1, the XOR of eight reads 0.
+    await tb.configure(ro_en=0, single_ro=0)
+    assert await tb.read_bytes(2) == [0x00, 0x00]
+    for sel in range(8):
+        await tb.configure(ro_en=0, single_ro=1, ro_sel=sel)
+        assert await tb.read_bytes(2) == [0xFF, 0xFF], f"RO_SEL={sel}"
+
+
+@cocotb.test(skip=GATES)
+async def test_single_ro_raw(dut):
+    tb = Tb(dut)
+    await tb.start()
+    for sel in (0, 7):
+        await tb.configure(ro_en=1, single_ro=1, ro_sel=sel)
+        data = await tb.read_bytes(16)
+        r = ones_ratio(data)
+        dut._log.info(f"RO_SEL={sel}: ones ratio {r:.3f}")
+        assert 0.3 < r < 0.7
 
 
 @cocotb.test()

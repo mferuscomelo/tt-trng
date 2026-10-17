@@ -35,26 +35,35 @@ module tt_um_mferuscomelo_trng (
   wire       whiten_en = cfg[1];
   wire       test_mode = cfg[2];
   wire [1:0] sample_div = cfg[4:3];
+  wire       single_ro = cfg[5];
+  wire [1:0] decim = cfg[7:6];
+  wire [2:0] ro_sel = cfg[10:8];
 
   // ---------------------------------------------------------------- rings
-  wire [3:0] ro_out;
+  wire [7:0] ro_out;
   wire       ring_en = rst_n & ena & ro_en;
 
   ring_osc #(.STAGES(5))  trng_ro0 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[0]));
   ring_osc #(.STAGES(7))  trng_ro1 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[1]));
-  ring_osc #(.STAGES(9))  trng_ro2 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[2]));
+  ring_osc #(.STAGES(11)) trng_ro2 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[2]));
   ring_osc #(.STAGES(13)) trng_ro3 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[3]));
+  ring_osc #(.STAGES(17)) trng_ro4 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[4]));
+  ring_osc #(.STAGES(19)) trng_ro5 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[5]));
+  ring_osc #(.STAGES(23)) trng_ro6 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[6]));
+  ring_osc #(.STAGES(29)) trng_ro7 (.clk(clk), .rst_n(rst_n), .en(ring_en), .out(ro_out[7]));
 
   // ---------------------------------------------------------------- sampling
   wire raw_bit, raw_valid;
 
   entropy_sampler #(
-      .N_RO(4)
+      .N_RO(8)
   ) u_sampler (
       .clk       (clk),
       .rst_n     (rst_n),
       .flush     (flush),
       .ro_out    (ro_out),
+      .single_ro (single_ro),
+      .ro_sel    (ro_sel),
       .sample_div(sample_div),
       .raw_bit   (raw_bit),
       .raw_valid (raw_valid)
@@ -66,6 +75,7 @@ module tt_um_mferuscomelo_trng (
       .clk      (clk),
       .rst_n    (rst_n),
       .flush    (flush),
+      .decim    (decim),
       .in_bit   (raw_bit),
       .in_valid (raw_valid),
       .out_bit  (vn_bit),
@@ -151,6 +161,6 @@ module tt_um_mferuscomelo_trng (
   assign uio_out = {5'b00000, miso, 2'b00};
   assign uio_oe = {5'b00000, miso_oe, 2'b00};
 
-  wire _unused = &{uio_in[7], uio_in[2:1], cfg[10:5], 1'b0};
+  wire _unused = &{uio_in[7], uio_in[2:1], 1'b0};
 
 endmodule
