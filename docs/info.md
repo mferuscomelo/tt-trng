@@ -9,7 +9,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Free-running ring oscillators made of standard cells (one NAND2 enable gate plus a chain of inverters, eight rings with odd, mostly co-prime lengths 5, 7, 11, 13, 17, 19, 23 and 29 stages) run at several hundred MHz. Their outputs are XORed (or, with SINGLE_RO, one ring is chosen by RO_SEL) and sampled by the 50 MHz system clock through a two-flop synchronizer. Each ring's phase jitter accumulates between samples, so the sampled bit is unpredictable.
+Free-running ring oscillators made of standard cells (one NAND2 enable gate plus a chain of inverters, eight rings with odd, mostly co-prime lengths 5, 7, 11, 13, 17, 19, 23 and 29 stages) run freely; each ring's frequency is set by its length and the cell delays and can be measured with the built-in divider. Their outputs are XORed (or, with SINGLE_RO, one ring is chosen by RO_SEL) and sampled by the 50 MHz system clock through a two-flop synchronizer. Each ring's phase jitter accumulates between samples, so the sampled bit is unpredictable.
 
 Processing chain:
 
@@ -26,7 +26,7 @@ Changing any configuration input (ui[7:0], uio[6:4]) flushes everything that hol
 | Pin | Function |
 | --- | --- |
 | ui[0] | RO_EN: 1 = rings run |
-| ui[1] | WHITEN: 1 = von Neumann debiasing, 0 = raw sampled bits |
+| ui[1] | WHITEN: 1 = XOR-decimation + von Neumann debiasing, 0 = raw sampled bits |
 | ui[2] | TEST: 1 = known-answer LFSR instead of the rings (overrides WHITEN) |
 | ui[4:3] | SAMPLE_DIV: keep one sample every 16 / 64 / 256 / 1024 clocks |
 | ui[5] | SINGLE_RO: 1 = sample only the ring selected by RO_SEL, 0 = XOR of all 8 |
@@ -36,14 +36,15 @@ Changing any configuration input (ui[7:0], uio[6:4]) flushes everything that hol
 | uo[2] | UNDERRUN: a byte was read while none was available (0x00 sent). Cleared at the next CS fall |
 | uo[3] | Last sampled raw bit |
 | uo[4] | Sample strobe, one clock wide per sample |
-| uo[5] | RO ÷64 (not implemented yet, always 0) |
+| uo[5] | Ring selected by RO_SEL divided by 64 while DIV_EN = 1, else 0 |
 | uo[6] | OVERFLOW: bits were dropped because the buffer was full. Cleared at the next CS fall |
+| uo[7] | 0 |
 | uio[0] | SPI CS_N (input) |
 | uio[1] | SPI MOSI (input, unused) |
 | uio[2] | SPI MISO (output, driven only while CS_N is low) |
 | uio[3] | SPI SCK (input) |
-| uio[6:4] | RO_SEL: ring used by SINGLE_RO (0 = 5 stages … 7 = 29 stages) |
-| uio[7] | DIV_EN (not implemented yet) |
+| uio[6:4] | RO_SEL: ring used by SINGLE_RO and the divider (0 = 5 stages … 7 = 29 stages) |
+| uio[7] | DIV_EN: 1 = enable the ÷64 ring divider on uo[5] |
 
 At 50 MHz the raw rate is 3.125 Mbit/s, 781 kbit/s, 195 kbit/s or 48.8 kbit/s for SAMPLE_DIV = 0..3; whitened output is about raw / (4 × DECIM).
 
@@ -65,8 +66,9 @@ A byte is only consumed on the first SCK rising edge of that byte, so ending a t
 Suggested bring-up:
 
 1. TEST = 1: read bytes and compare with `87 35 44 E2 EC 23 B9 C7 ...`. This checks the clock, SPI wiring and timing.
-2. RO_EN = 1, WHITEN = 0: capture raw bytes for each ring alone (SINGLE_RO = 1, RO_SEL = 0..7) and for the XOR of all rings, at each SAMPLE_DIV, and run the NIST SP 800-90B entropy assessment tool (<https://github.com/usnistgov/SP800-90B_EntropyAssessment>) on them.
-3. Choose SAMPLE_DIV and DECIM from the results, then capture whitened output (WHITEN = 1) for statistical tests.
+2. RO_EN = 1, DIV_EN = 1, RO_SEL = 0..7: measure the frequency on uo[5]; the ring frequency is 64 times that. The divider is a debug aid: its first flip-flop may not keep up with the shortest rings, so a reading that does not scale with ring length (5 : 7 : 11 : … : 29) means the divider, not the ring, is the limit.
+3. RO_EN = 1, WHITEN = 0: capture raw bytes for each ring alone (SINGLE_RO = 1, RO_SEL = 0..7) and for the XOR of all rings, at each SAMPLE_DIV, and run the NIST SP 800-90B entropy assessment tool (<https://github.com/usnistgov/SP800-90B_EntropyAssessment>) on them.
+4. Choose SAMPLE_DIV and DECIM from the results, then capture whitened output (WHITEN = 1) for statistical tests.
 
 Simulation cannot show whether the rings produce real entropy. Only measurements on silicon can.
 

@@ -166,12 +166,23 @@ module tt_um_mferuscomelo_trng (
   );
 
   // ---------------------------------------------------------------- outputs
-  wire ro_div = 1'b0;  // phase 5
+  wire ro_div;
+
+  ro_divider #(
+      .N_RO(8)
+  ) u_div (
+      .clk         (clk),
+      .rst_n       (rst_n),
+      .div_en_async(uio_in[7]),
+      .ro_out      (ro_out),
+      .ro_sel      (ro_sel),
+      .div_out     (ro_div)
+  );
 
   assign uo_out = {1'b0, overflow, ro_div, raw_valid, raw_bit, underrun, health_fail, !fifo_empty};
   assign uio_out = {5'b00000, miso, 2'b00};
   assign uio_oe = {5'b00000, miso_oe, 2'b00};
 
-  wire _unused = &{uio_in[7], uio_in[2:1], 1'b0};
+  wire _unused = &{uio_in[2:1], 1'b0};
 
 endmodule

@@ -387,6 +387,47 @@ async def test_health_gated(dut):
     assert await feed_pattern(tb, [1], 100) is None, "health must be off in TEST mode"
 
 
+async def rising_edge_times(tb, n, timeout_ns):
+    """Times (ns) of the next n rising edges of uo[5], polled every 1 ns."""
+    times = []
+    last = tb.uo(RO_DIV)
+    t0 = cocotb.utils.get_sim_time("ns")
+    while len(times) < n:
+        await Timer(1, unit="ns")
+        now = tb.uo(RO_DIV)
+        if now and not last:
+            times.append(cocotb.utils.get_sim_time("ns"))
+        last = now
+        assert cocotb.utils.get_sim_time("ns") - t0 < timeout_ns, "divider output not toggling"
+    return times
+
+
+@cocotb.test()
+async def test_divider(dut):
+    """uo[5] is 0 with DIV_EN = 0, toggles with DIV_EN = 1. At gate level the
+    ring cells have a 1 ns delay, so the period must be 64 * 2 * stages ns."""
+    stages = [5, 7, 11, 13, 17, 19, 23, 29]
+    tb = Tb(dut)
+    await tb.start(ro_en=1)
+    await ClockCycles(dut.clk, 2000)
+    assert tb.uo(RO_DIV) == 0, "divider output must be 0 while DIV_EN = 0"
+    tb.div_en = 1
+    for sel in range(8) if GATES else (0, 7):
+        await tb.configure(ro_en=1, ro_sel=sel)
+        if GATES:
+            await rising_edge_times(tb, 1, 64 * 2 * stages[sel] * 3)  # settle
+            t = await rising_edge_times(tb, 2, 64 * 2 * stages[sel] * 3)
+            period = t[1] - t[0]
+            dut._log.info(f"RO_SEL={sel}: divider period {period} ns")
+            assert abs(period - 64 * 2 * stages[sel]) <= 1, f"RO_SEL={sel}: period {period}"
+        else:
+            await rising_edge_times(tb, 2, 64 * 4 * CLK_NS * 4)
+    tb.div_en = 0
+    tb._drive_uio()
+    await ClockCycles(dut.clk, 5)
+    assert tb.uo(RO_DIV) == 0
+
+
 @cocotb.test()
 async def test_sample_interval(dut):
     tb = Tb(dut)
