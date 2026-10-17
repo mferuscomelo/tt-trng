@@ -300,6 +300,19 @@ async def test_burst(dut):
 
 
 @cocotb.test()
+async def test_fifo_depth(dut):
+    """4 bytes are buffered before OVERFLOW; a burst then reads all 4."""
+    tb = Tb(dut)
+    await tb.start(ro_en=0, whiten=0)  # raw: one 0x00 byte every 128 clocks
+    await ClockCycles(dut.clk, 128 * 4 + 64)
+    assert tb.uo(OVERFLOW) == 0, "OVERFLOW before the FIFO holds 4 bytes"
+    await ClockCycles(dut.clk, 128)
+    assert tb.uo(OVERFLOW) == 1, "no OVERFLOW with 4 bytes buffered and a 5th complete"
+    assert await tb.spi_read(4) == [0, 0, 0, 0]
+    assert tb.uo(UNDERRUN) == 0
+
+
+@cocotb.test()
 async def test_overflow(dut):
     tb = Tb(dut)
     await tb.start(ro_en=0, whiten=0)  # raw: one bit every 16 clocks, never stops

@@ -22,6 +22,10 @@ module fifo #(
 
   localparam PW = (DEPTH > 1) ? $clog2(DEPTH) : 1;
   localparam CW = $clog2(DEPTH + 1);
+  localparam integer LAST_I = DEPTH - 1;
+  localparam integer FULL_I = DEPTH;
+  localparam [PW-1:0] LAST = LAST_I[PW-1:0];
+  localparam [CW-1:0] FULL = FULL_I[CW-1:0];
 
   reg [7:0] mem[0:DEPTH-1];
   reg [CW-1:0] count;
@@ -30,8 +34,8 @@ module fifo #(
   wire do_push = push && !full;
   wire do_pop = pop && !empty;
 
-  assign empty = (count == 0);
-  assign full  = (count == DEPTH);
+  assign empty = (count == {CW{1'b0}});
+  assign full  = (count == FULL);
   assign dout  = mem[rd];
 
   integer i;
@@ -48,11 +52,11 @@ module fifo #(
     end else begin
       if (do_push) begin
         mem[wr] <= din;
-        wr <= (wr == DEPTH - 1) ? 0 : wr + 1;
+        wr <= (wr == LAST) ? {PW{1'b0}} : wr + 1'b1;
       end
-      if (do_pop) rd <= (rd == DEPTH - 1) ? 0 : rd + 1;
-      if (do_push && !do_pop) count <= count + 1;
-      else if (do_pop && !do_push) count <= count - 1;
+      if (do_pop) rd <= (rd == LAST) ? {PW{1'b0}} : rd + 1'b1;
+      if (do_push && !do_pop) count <= count + 1'b1;
+      else if (do_pop && !do_push) count <= count - 1'b1;
     end
   end
 

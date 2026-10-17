@@ -122,7 +122,7 @@ module tt_um_mferuscomelo_trng (
   );
 
   fifo #(
-      .DEPTH(1)
+      .DEPTH(4)
   ) u_fifo (
       .clk  (clk),
       .rst_n(rst_n),

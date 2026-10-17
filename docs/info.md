@@ -16,7 +16,7 @@ Processing chain:
 1. **Sampling**: one sample is kept every 16, 64, 256 or 1024 clocks (SAMPLE_DIV). Longer intervals let more jitter accumulate, which makes successive bits less correlated, at the cost of throughput.
 2. **Whitening** (WHITEN = 1): first XOR-decimation (DECIM: 1, 2, 4 or 8 sampled bits are XORed into one), which reduces bias and correlation; then von Neumann debiasing (bit pairs 01 → 0, 10 → 1, 00/11 dropped), which removes the remaining bias from independent bits. Output is about one bit per 4 × DECIM samples. With WHITEN = 0 the sampled bits are passed through unchanged, which is what you want for entropy assessment.
 3. **TEST mode** (TEST = 1): a 16-bit LFSR (seed 0xACE1, taps 16/14/13/11) replaces the entropy source, so the whole readout path can be checked against a known answer. The first bytes are `87 35 44 E2 EC 23 B9 C7 A8 11 4A F7`.
-4. **Packing and SPI**: bits are packed MSB first into bytes and read through an SPI peripheral.
+4. **Packing and SPI**: bits are packed MSB first into bytes, buffered in a 4-byte FIFO and read through an SPI peripheral. When the FIFO is full, new entropy bits are dropped (OVERFLOW); in TEST mode the LFSR waits instead, so the known-answer sequence never skips.
 
 Changing any configuration input (ui[7:0], uio[6:4]) flushes everything that holds partial data, so no byte ever mixes two configurations. In TEST mode the LFSR restarts from its seed.
 
