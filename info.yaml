@@ -1,56 +1,64 @@
 # Tiny Tapeout project information
 project:
-  title:        ""      # Project title
-  author:       ""      # Your name
+  title:        "Ring Oscillator TRNG"      # Project title
+  author:       "Milan Ferus-Comelo"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  ""      # One line description of what your project does
+  description:  "True random number generator from free-running ring oscillators, read out over SPI"      # One line description of what your project does
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
-  clock_hz:     0       # Clock frequency in Hz (or 0 if not applicable)
+  clock_hz:     50000000      # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 167x108 uM.
   tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_example"
+  top_module:  "tt_um_mferuscomelo_trng"
 
   # List your project's source files here.
   # Source files must be in ./src and you must list each source file separately, one per line.
   # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
     - "project.v"
+    - "ring_osc.v"
+    - "source_select.v"
+    - "entropy_sampler.v"
+    - "whiten.v"
+    - "lfsr_test.v"
+    - "byte_packer.v"
+    - "fifo.v"
+    - "spi_peripheral.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: ""
-  ui[1]: ""
-  ui[2]: ""
-  ui[3]: ""
-  ui[4]: ""
-  ui[5]: ""
-  ui[6]: ""
-  ui[7]: ""
+  ui[0]: "RO_EN"
+  ui[1]: "WHITEN"
+  ui[2]: "TEST"
+  ui[3]: "SAMPLE_DIV[0]"
+  ui[4]: "SAMPLE_DIV[1]"
+  ui[5]: "SINGLE_RO"
+  ui[6]: "DECIM[0]"
+  ui[7]: "DECIM[1]"
 
   # Outputs
-  uo[0]: ""
-  uo[1]: ""
-  uo[2]: ""
-  uo[3]: ""
-  uo[4]: ""
-  uo[5]: ""
-  uo[6]: ""
+  uo[0]: "FIFO_READY"
+  uo[1]: "HEALTH_FAIL"
+  uo[2]: "UNDERRUN"
+  uo[3]: "RAW_BIT"
+  uo[4]: "RAW_STROBE"
+  uo[5]: "RO_DIV64"
+  uo[6]: "OVERFLOW"
   uo[7]: ""
 
   # Bidirectional pins
-  uio[0]: ""
-  uio[1]: ""
-  uio[2]: ""
-  uio[3]: ""
-  uio[4]: ""
-  uio[5]: ""
-  uio[6]: ""
-  uio[7]: ""
+  uio[0]: "SPI_CS_N"
+  uio[1]: "SPI_MOSI (unused)"
+  uio[2]: "SPI_MISO"
+  uio[3]: "SPI_SCK"
+  uio[4]: "RO_SEL[0]"
+  uio[5]: "RO_SEL[1]"
+  uio[6]: "RO_SEL[2]"
+  uio[7]: "DIV_EN"
 
 # Do not change!
 yaml_version: 6
